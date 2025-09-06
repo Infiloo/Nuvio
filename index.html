@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuvio - Where to Watch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .modal-overlay {
+            transition: opacity 0.3s ease;
+        }
+        .modal-container {
+            transition: transform 0.3s ease;
+        }
+        /* Style for consistent card image height */
+        .card-img {
+            height: 0;
+            padding-bottom: 150%; /* Creates a 2:3 aspect ratio */
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        /* Card hover effect */
+        .movie-card {
+            transition: transform 0.3s ease-in-out;
+        }
+        .movie-card:hover {
+            transform: scale(1.05); /* Slightly enlarge on hover */
+            z-index: 10; /* Bring hovered card to front */
+        }
+        /* Sticky header styles */
+        .sticky-header {
+            backdrop-filter: blur(8px); /* Blur effect */
+            -webkit-backdrop-filter: blur(8px); /* For Safari */
+            background-color: rgba(17, 24, 39, 0.8); /* Dark background with transparency */
+            transition: top 0.3s ease-in-out;
+        }
+        /* Autocomplete suggestions styling */
+        .autocomplete-suggestions {
+            background-color: rgba(31, 41, 55, 0.9); /* bg-gray-800 with transparency */
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-lg */
+            overflow: hidden; /* Ensure content is clipped if it exceeds bounds */
+            opacity: 0; /* Start hidden for fade-in */
+            transition: opacity 0.5s ease-in-out; /* Fade transition */
+        }
+        .autocomplete-suggestions.visible {
+            opacity: 1; /* Make visible */
+        }
+        .autocomplete-suggestions div {
+            padding: 0.75rem 1rem; /* py-3 px-4 */
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .autocomplete-suggestions div:hover {
+            background-color: rgba(55, 65, 81, 0.7); /* bg-gray-700 with transparency */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+
+    <!-- Sticky Header (initially hidden) -->
+    <div id="sticky-header" class="fixed top-[-100px] left-0 right-0 z-40 p-4 sticky-header shadow-lg">
+        <div class="container mx-auto flex items-center justify-between">
+            <h2 class="text-3xl font-bold text-white">Nuvio</h2>
+            <form id="sticky-search-form" class="relative w-1/2 md:w-1/3">
+                <div class="relative">
+                    <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                    </svg>
+                    <input type="text" id="sticky-search-input" placeholder="Search for movies, series..." class="w-full bg-gray-800 border border-gray-700 text-white rounded-full py-2 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-300">
+                </div>
+                <div id="sticky-autocomplete-suggestions" class="absolute w-full mt-2 autocomplete-suggestions hidden z-30">
+                    <!-- Suggestions will be injected here -->
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 md:py-16">
+        <!-- Header -->
+        <header class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold text-white tracking-tight">Nuvio</h1>
+            <p class="text-gray-400 mt-2 text-lg">Your guide to streaming movies and series.</p>
+        </header>
+
+        <!-- Search Bar -->
+        <div class="max-w-2xl mx-auto mb-12">
+            <form id="main-search-form" class="relative">
+                <div class="relative">
+                    <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                    </svg>
+                    <input type="text" id="main-search-input" placeholder="Search for movies, series..." class="w-full bg-gray-800 border border-gray-700 text-white rounded-full py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-300">
+                </div>
+                <div id="main-autocomplete-suggestions" class="absolute w-full mt-2 autocomplete-suggestions hidden z-30">
+                    <!-- Suggestions will be injected here -->
+                </div>
+            </form>
+        </div>
+
+        <!-- Initial Content Sections -->
+        <div id="initial-content" class="max-w-5xl mx-auto">
+            <!-- New Movies Section -->
+            <section class="mb-12">
+                <h2 class="text-3xl font-bold mb-6 text-center">New Movies</h2>
+                <div id="new-movies-loading" class="text-center hidden">
+                    <p class="text-gray-400">Loading new movies...</p>
+                </div>
+                <div id="new-movies-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                    <!-- New movies will be injected here -->
+                </div>
+                <div id="new-movies-error" class="text-center mt-4 hidden">
+                    <p class="text-red-400">Error loading new movies. Please try again later.</p>
+                </div>
+            </section>
+
+            <!-- Movie Recommendations Section -->
+            <section class="mb-12">
+                <h2 class="text-3xl font-bold mb-6 text-center">AI Movie Recommendations</h2>
+                <div id="recommendations-loading" class="text-center hidden">
+                    <p class="text-gray-400">Generating recommendations...</p>
+                </div>
+                <div id="recommendations-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                    <!-- Recommendations will be injected here -->
+                </div>
+                <div id="recommendations-error" class="text-center mt-4 hidden">
+                    <p class="text-red-400">Error generating recommendations. Please try again later.</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Loading Indicator for Search -->
+        <div id="loading" class="text-center mt-8 hidden">
+             <p class="text-gray-400">Searching...</p>
+        </div>
+
+        <!-- Results Section (for search) -->
+        <div id="results-section" class="mt-12 max-w-5xl mx-auto hidden">
+            <h2 id="results-title" class="text-2xl font-bold mb-6 text-center"></h2>
+            <div id="results-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                <!-- Search results will be injected here -->
+            </div>
+        </div>
+        
+        <!-- No Results Message (for search) -->
+        <div id="no-results" class="text-center mt-12 hidden">
+            <h3 class="text-2xl font-semibold">No Results Found</h3>
+            <p class="text-gray-400 mt-2">We couldn't find anything matching your search. Please try a different query.</p>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50 modal-overlay">
+        <div id="modal-container" class="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl transform scale-95 modal-container relative">
+            <div id="modal-content" class="p-6 md:p-8">
+                <!-- Modal content will be injected here -->
+            </div>
+             <button id="modal-close" class="absolute top-4 right-4 text-gray-400 hover:text-white transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Global Variables for Canvas Environment (DO NOT MODIFY) ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // FIX: Changed 'initialAuthToken' to '__initial_auth_token' on the right side
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- DOM Elements ---
+        const mainSearchForm = document.getElementById('main-search-form');
+        const mainSearchInput = document.getElementById('main-search-input');
+        const mainAutocompleteSuggestions = document.getElementById('main-autocomplete-suggestions');
+
+        const stickyHeader = document.getElementById('sticky-header');
+        const stickySearchForm = document.getElementById('sticky-search-form');
+        const stickySearchInput = document.getElementById('sticky-search-input');
+        const stickyAutocompleteSuggestions = document.getElementById('sticky-autocomplete-suggestions');
+
+        const initialContent = document.getElementById('initial-content');
+        const newMoviesGrid = document.getElementById('new-movies-grid');
+        const newMoviesLoading = document.getElementById('new-movies-loading');
+        const newMoviesError = document.getElementById('new-movies-error');
+        const recommendationsGrid = document.getElementById('recommendations-grid');
+        const recommendationsLoading = document.getElementById('recommendations-loading');
+        const recommendationsError = document.getElementById('recommendations-error');
+        const resultsSection = document.getElementById('results-section');
+        const resultsTitle = document.getElementById('results-title');
+        const resultsGrid = document.getElementById('results-grid');
+        const noResults = document.getElementById('no-results');
+        const loading = document.getElementById('loading');
+        const modalOverlay = document.getElementById('modal-overlay');
+        const modalContainer = document.getElementById('modal-container');
+        const modalContent = document.getElementById('modal-content');
+        const modalClose = document.getElementById('modal-close');
+        
+        // --- API Configuration ---
+        const OMDb_API_KEY = '53b11f9e'; // Your OMDb API Key
+
+        // --- Variables for hover effect and autocomplete ---
+        let hoverTimeout;
+        let autocompleteTimeout;
+
+        /**
+         * Debounce function to limit API calls.
+         * @param {Function} func The function to debounce.
+         * @param {number} delay The delay in milliseconds.
+         */
+        function debounce(func, delay) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), delay);
+            };
+        }
+
+        /**
+         * Fetches search results from the OMDb API.
+         * @param {string} query The search query.
+         * @returns {Promise<Array>} A promise that resolves with an array of results.
+         */
+        async function fetchResults(query) {
+            loading.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+            noResults.classList.add('hidden');
+            initialContent.classList.add('hidden'); // Hide initial content when searching
+            
+            const url = `https://www.omdbapi.com/?s=${encodeURIComponent(query)}&apikey=${OMDb_API_KEY}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                loading.classList.add('hidden');
+
+                if (data.Response === "True") {
+                    return data.Search; // OMDb returns results in a 'Search' array
+                } else {
+                    // Display the error message from OMDb if it exists
+                    if (data.Error === "Invalid API key!") {
+                        noResults.querySelector('p').textContent = "Error: Invalid OMDb API key. Please check your key on omdbapi.com/apikey.aspx";
+                    } else if (data.Error === "Request limit reached!") {
+                        noResults.querySelector('p').textContent = "Error: Daily OMDb API request limit reached. Please try again tomorrow.";
+                    } else {
+                        noResults.querySelector('p').textContent = data.Error || "We couldn't find anything matching your search. Please try a different query.";
+                    }
+                    noResults.classList.remove('hidden');
+                    return [];
+                }
+            } catch (error) {
+                console.error("Error fetching data from OMDb:", error);
+                loading.classList.add('hidden');
+                noResults.querySelector('p').textContent = "A network error occurred. Please check your internet connection and OMDb API key.";
+                noResults.classList.remove('hidden'); 
+                return [];
+            }
+        }
+
+        /**
+         * Fetches detailed information for an item by title from OMDb.
+         * Useful for getting full details from a simple title.
+         * @param {string} title The title of the item.
+         * @returns {Promise<Object|null>} A promise that resolves with the item details or null if not found.
+         */
+        async function fetchDetailsByTitle(title) {
+            const url = `https://www.omdbapi.com/?t=${encodeURIComponent(title)}&apikey=${OMDb_API_KEY}&plot=full`;
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.Response === "True") {
+                    return data;
+                } else {
+                    if (data.Error === "Invalid API key!") {
+                        console.error("OMDb API Error: Invalid API key!");
+                    } else if (data.Error === "Request limit reached!") {
+                        console.error("OMDb API Error: Request limit reached!");
+                    } else {
+                        console.error(`OMDb API Error for "${title}":`, data.Error);
+                    }
+                    return null;
+                }
+            } catch (error) {
+                console.error(`Error fetching details for "${title}":`, error);
+                return null;
+            }
+        }
+
+        /**
+         * Displays a list of items (movies/series) in a specified grid.
+         * @param {Array} items The array of result items from OMDb.
+         * @param {HTMLElement} targetGrid The DOM element (grid) where cards should be appended.
+         */
+        function displayCards(items, targetGrid) {
+            targetGrid.innerHTML = ''; // Clear previous results
+
+            if (!items || items.length === 0) {
+                // If no items, ensure results section is hidden and no results message is shown if it's the main search grid
+                if (targetGrid === resultsGrid) {
+                    noResults.classList.remove('hidden');
+                    resultsSection.classList.add('hidden');
+                }
+                return;
+            }
+
+            // If items are found and it's the results grid, show the results section
+            if (targetGrid === resultsGrid) {
+                noResults.classList.add('hidden'); // Hide no results if we have items
+                resultsSection.classList.remove('hidden'); // Show results section
+            }
+
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-800 rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition duration-300 cursor-pointer flex flex-col movie-card';
+                
+                // OMDb properties: Title, Year, Poster, imdbID, Type
+                const posterUrl = item.Poster && item.Poster !== 'N/A' ? item.Poster : 'https://placehold.co/500x750/4a5568/ffffff?text=No+Image';
+                
+                card.innerHTML = `
+                    <div class="card-img" style="background-image: url('${posterUrl}')"></div>
+                    <div class="p-4 flex flex-col flex-grow">
+                        <h3 class="font-bold text-md flex-grow">${item.Title}</h3>
+                        <p class="text-gray-400 text-sm capitalize mt-2">${item.Type} &bull; ${item.Year}</p>
+                    </div>
+                `;
+                // Pass the imdbID to the openModal function
+                card.addEventListener('click', () => openModal(item.imdbID));
+                
+                // Add hover effects
+                card.addEventListener('mouseenter', () => {
+                    clearTimeout(hoverTimeout); // Clear any pending shrink timeout
+                    card.classList.add('hovered'); // Add a class for potential future styling if needed
+                });
+
+                card.addEventListener('mouseleave', () => {
+                    hoverTimeout = setTimeout(() => {
+                        card.classList.remove('hovered');
+                    }, 500); // Shrink after 0.5 seconds
+                });
+
+                targetGrid.appendChild(card);
+            });
+        }
+
+        /**
+         * Fetches new movies (simulated by searching for popular recent titles).
+         */
+        async function fetchNewMovies() {
+            newMoviesLoading.classList.remove('hidden');
+            newMoviesError.classList.add('hidden');
+            newMoviesGrid.innerHTML = ''; // Clear previous content
+
+            try {
+                // Using a list of recent and upcoming movie titles from search results for 2025.
+                // OMDb's free tier doesn't have a direct "new releases" or "trending" endpoint.
+                // For a real-world app, you'd use a more comprehensive movie API.
+                const newMovieTitles = [
+                    "Jurassic World Rebirth", "Superman", "Smurfs", "I Know What You Did Last Summer",
+                    "Eddington", "Dog Man", "The Last Showgirl", "Bridget Jones: Mad About The Boy",
+                    "Captain America: Brave New World", "Mickey 17", "Black Bag", "The Electric State",
+                    "The Alto Knights", "Disney's Snow White", "A Minecraft Movie", "The Amateur",
+                    "Sinners", "Drop", "Until Dawn", "The Accountant 2", "The Fantastic Four: First Steps",
+                    "Happy Gilmore 2", "The Home", "House on Eden", "Elio", "Nobody 2", "The Bad Guys 2"
+                ];
+                const newMovies = [];
+
+                for (const title of newMovieTitles) {
+                    const movie = await fetchDetailsByTitle(title);
+                    if (movie) {
+                        newMovies.push(movie);
+                    }
+                }
+                displayCards(newMovies, newMoviesGrid);
+            } catch (error) {
+                console.error("Error fetching new movies:", error);
+                newMoviesError.classList.remove('hidden');
+                newMoviesError.querySelector('p').textContent = "Error loading new movies. Please check your OMDb API key and internet connection.";
+            } finally {
+                newMoviesLoading.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Fetches movie recommendations using the Gemini API and then their details from OMDb.
+         */
+        async function fetchRecommendations() {
+            recommendationsLoading.classList.remove('hidden');
+            recommendationsError.classList.add('hidden');
+            recommendationsGrid.innerHTML = ''; // Clear previous content
+
+            try {
+                const prompt = "Generate a list of 5 popular and diverse movie recommendations (e.g., different genres, eras). Provide the output as a JSON array of objects, where each object has a 'title' key for the movie title. Example: [{\"title\": \"Movie A\"}, {\"title\": \"Movie B\"}]";
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                
+                const payload = {
+                    contents: chatHistory,
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "ARRAY",
+                            items: {
+                                type: "OBJECT",
+                                properties: {
+                                    "title": { "type": "STRING" }
+                                },
+                                "propertyOrdering": ["title"]
+                            }
+                        }
+                    }
+                };
+                
+                const apiKey = ""; // Canvas will provide this API key at runtime
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    
+                    const jsonString = result.candidates[0].content.parts[0].text;
+                    const recommendedTitles = JSON.parse(jsonString);
+                    const recommendedMovies = [];
+
+                    for (const rec of recommendedTitles) {
+                        if (rec.title) {
+                            const movie = await fetchDetailsByTitle(rec.title);
+                            if (movie) {
+                                recommendedMovies.push(movie);
+                            }
+                        }
+                    }
+                    displayCards(recommendedMovies, recommendationsGrid);
+
+                } else {
+                    console.error("LLM response structure unexpected:", result);
+                    recommendationsError.classList.remove('hidden');
+                    recommendationsError.querySelector('p').textContent = "Error generating recommendations. Please try again later.";
+                }
+
+            } catch (error) {
+                console.error("Error generating or fetching recommendations:", error);
+                recommendationsError.classList.remove('hidden');
+                recommendationsError.querySelector('p').textContent = "A network error occurred or AI recommendations could not be loaded. Please try again.";
+            } finally {
+                recommendationsLoading.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Fetches detailed information for an item and opens the modal.
+         * @param {string} imdbID The IMDb ID of the item.
+         */
+        async function openModal(imdbID) {
+            // Show loading state in modal immediately
+            modalContent.innerHTML = `<div class="text-center p-8"><p class="text-lg">Loading details...</p></div>`;
+            modalOverlay.classList.remove('hidden');
+             setTimeout(() => {
+                 modalOverlay.classList.remove('opacity-0');
+                 modalContainer.classList.remove('scale-95');
+            }, 10);
+
+            const url = `https://www.omdbapi.com/?i=${imdbID}&apikey=${OMDb_API_KEY}&plot=full`;
+
+            try {
+                const response = await fetch(url);
+                const item = await response.json();
+
+                if (item.Response === "True") {
+                    const trailerSearchQuery = `${item.Title} ${item.Year || ''} trailer YouTube`;
+                    const trailerUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(trailerSearchQuery)}`;
+
+                    // Generate ratings HTML
+                    let ratingsHtml = '';
+                    if (item.Ratings && item.Ratings.length > 0) {
+                        ratingsHtml = `
+                            <div class="mb-4">
+                                <h4 class="font-semibold text-gray-300 mb-2">Ratings:</h4>
+                                <ul class="list-disc list-inside text-gray-400 text-sm">
+                                    ${item.Ratings.map(rating => `
+                                        <li>${rating.Source}: <span class="text-white font-bold">${rating.Value}</span></li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    } else {
+                        ratingsHtml = `<p class="text-gray-400 text-sm mb-4">No ratings available.</p>`;
+                    }
+
+
+                     modalContent.innerHTML = `
+                        <div class="flex flex-col md:flex-row gap-6 md:gap-8">
+                            <div class="md:w-1/3 flex-shrink-0">
+                                <img src="${item.Poster && item.Poster !== 'N/A' ? item.Poster : 'https://placehold.co/500x750/4a5568/ffffff?text=No+Image'}" alt="Poster for ${item.Title}" class="rounded-lg w-full shadow-lg">
+                            </div>
+                            <div class="flex-grow">
+                                <h2 class="text-3xl font-bold mb-2">${item.Title}</h2>
+                                <div class="flex items-center flex-wrap gap-x-4 gap-y-2 mb-4 text-gray-400 text-sm">
+                                    <span>${item.Year}</span>
+                                    ${item.Rated && item.Rated !== 'N/A' ? `<span class="before:content-['•'] before:mr-3">${item.Rated}</span>` : ''}
+                                    ${item.Runtime && item.Runtime !== 'N/A' ? `<span class="before:content-['•'] before:mr-3">${item.Runtime}</span>` : ''}
+                                </div>
+                                <span class="inline-block bg-purple-600 text-purple-100 text-xs font-semibold px-2 py-1 rounded-full uppercase mb-4 capitalize">${item.Type}</span>
+                                <p class="text-gray-300 mb-2 font-semibold text-sm">Genre: ${item.Genre && item.Genre !== 'N/A' ? item.Genre : 'N/A'}</p>
+                                ${ratingsHtml} <!-- Insert ratings here -->
+                                <p class="text-gray-300 mb-6">${item.Plot && item.Plot !== 'N/A' ? item.Plot : 'No description available.'}</p>
+                                <div class="flex flex-col gap-3">
+                                    <a href="https://www.justwatch.com/us/search?q=${encodeURIComponent(item.Title)}" target="_blank" rel="noopener noreferrer" class="inline-block w-full text-center bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300">
+                                        Where to Watch
+                                    </a>
+                                    <a href="${trailerUrl}" target="_blank" rel="noopener noreferrer" class="inline-block w-full text-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300">
+                                        Watch Trailer
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    let errorMessage = "Could not load details. Please try again.";
+                    if (item.Error === "Invalid API key!") {
+                        errorMessage = "Error: Invalid OMDb API key. Please check your key on omdbapi.com/apikey.aspx";
+                    } else if (item.Error === "Request limit reached!") {
+                        errorMessage = "Error: Daily OMDb API request limit reached. Please try again tomorrow.";
+                    }
+                    modalContent.innerHTML = `<div class="text-center p-8"><p>${errorMessage}</p></div>`;
+                }
+            } catch (error) {
+                console.error("Error fetching item details:", error);
+                modalContent.innerHTML = `<div class="text-center p-8"><p>A network error occurred. Please check your internet connection.</p></div>`;
+            }
+        }
+
+        /**
+         * Closes the modal.
+         */
+        function closeModal() {
+            modalOverlay.classList.add('opacity-0');
+            modalContainer.classList.add('scale-95');
+            setTimeout(() => {
+                modalOverlay.classList.add('hidden');
+            }, 300);
+        }
+
+        /**
+         * Fetches autocomplete suggestions from OMDb.
+         * @param {string} query The search query.
+         * @param {HTMLElement} suggestionsContainer The container to display suggestions in.
+         * @param {HTMLInputElement} targetInput The input field to populate on selection.
+         */
+        async function fetchAutocompleteSuggestions(query, suggestionsContainer, targetInput) {
+            suggestionsContainer.innerHTML = ''; // Clear previous suggestions
+            // Do NOT add hidden class immediately, control with opacity and then add hidden after transition
+            suggestionsContainer.classList.remove('visible'); // Start fade-out if visible
+
+            if (query.length < 3) { // Only fetch suggestions for queries with 3 or more characters
+                // If query is too short, start fade-out and then hide
+                suggestionsContainer.classList.remove('visible');
+                setTimeout(() => {
+                    suggestionsContainer.classList.add('hidden');
+                }, 500); // Match CSS transition duration
+                return;
+            }
+
+            // OMDb API search endpoint for autocomplete
+            const url = `https://www.omdbapi.com/?s=${encodeURIComponent(query)}&apikey=${OMDb_API_KEY}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                console.log("Autocomplete API Response:", data); // Log API response for debugging
+
+                if (data.Response === "True" && data.Search) {
+                    // Filter for movies and series client-side
+                    const filteredResults = data.Search.filter(item => item.Type === 'movie' || item.Type === 'series');
+                    
+                    if (filteredResults.length > 0) {
+                        filteredResults.slice(0, 5).forEach(item => { // Limit to 5 suggestions
+                            const suggestionDiv = document.createElement('div');
+                            suggestionDiv.textContent = `${item.Title} (${item.Year})`;
+                            suggestionDiv.classList.add('py-3', 'px-4', 'cursor-pointer', 'transition', 'duration-200', 'ease-in-out'); // Apply Tailwind classes
+                            suggestionDiv.addEventListener('mouseenter', () => {
+                                suggestionDiv.style.backgroundColor = 'rgba(55, 65, 81, 0.7)'; // bg-gray-700 with transparency
+                            });
+                            suggestionDiv.addEventListener('mouseleave', () => {
+                                suggestionDiv.style.backgroundColor = ''; // Reset background
+                            });
+                            suggestionDiv.addEventListener('click', () => {
+                                targetInput.value = item.Title;
+                                // Hide suggestions immediately on click, then fade out
+                                suggestionsContainer.classList.remove('visible');
+                                setTimeout(() => {
+                                    suggestionsContainer.classList.add('hidden');
+                                }, 500); // Match CSS transition duration
+                                
+                                // Trigger a search when a suggestion is clicked
+                                const event = new Event('submit', { bubbles: true, cancelable: true });
+                                if (targetInput.id === 'main-search-input') {
+                                    mainSearchForm.dispatchEvent(event);
+                                } else if (targetInput.id === 'sticky-search-input') {
+                                    stickySearchForm.dispatchEvent(event);
+                                }
+                            });
+                            suggestionsContainer.appendChild(suggestionDiv);
+                        });
+                        suggestionsContainer.classList.remove('hidden'); // Ensure it's not hidden
+                        setTimeout(() => {
+                            suggestionsContainer.classList.add('visible'); // Trigger fade-in
+                        }, 10); // Small delay to allow 'hidden' to be removed before 'visible' is added
+                    } else {
+                        // No filtered results, so fade out and then hide
+                        suggestionsContainer.classList.remove('visible');
+                        setTimeout(() => {
+                            suggestionsContainer.classList.add('hidden');
+                        }, 500); // Match CSS transition duration
+                    }
+                } else {
+                    // If response is false or no search results, fade out and then hide
+                    suggestionsContainer.classList.remove('visible');
+                    setTimeout(() => {
+                        suggestionsContainer.classList.add('hidden');
+                    }, 500); // Match CSS transition duration
+                }
+            } catch (error) {
+                console.error("Error fetching autocomplete suggestions:", error);
+                // On network error, fade out and then hide
+                suggestionsContainer.classList.remove('visible');
+                setTimeout(() => {
+                    suggestionsContainer.classList.add('hidden');
+                }, 500); // Match CSS transition duration
+            }
+        }
+
+        const debouncedMainAutocomplete = debounce((query) => {
+            fetchAutocompleteSuggestions(query, mainAutocompleteSuggestions, mainSearchInput);
+        }, 300);
+
+        const debouncedStickyAutocomplete = debounce((query) => {
+            fetchAutocompleteSuggestions(query, stickyAutocompleteSuggestions, stickySearchInput);
+        }, 300);
+
+
+        // --- Event Listeners ---
+        mainSearchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = mainSearchInput.value.trim();
+            mainAutocompleteSuggestions.classList.remove('visible'); // Start fade-out on submit
+            setTimeout(() => {
+                mainAutocompleteSuggestions.classList.add('hidden'); // Hide after transition
+            }, 500);
+            if (query) {
+                const results = await fetchResults(query);
+                displayCards(results, resultsGrid);
+                resultsTitle.textContent = `Results for "${query}"`;
+            } else {
+                resultsSection.classList.add('hidden');
+                noResults.classList.add('hidden');
+                initialContent.classList.remove('hidden');
+            }
+        });
+
+        stickySearchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = stickySearchInput.value.trim();
+            stickyAutocompleteSuggestions.classList.remove('visible'); // Start fade-out on submit
+            setTimeout(() => {
+                stickyAutocompleteSuggestions.classList.add('hidden'); // Hide after transition
+            }, 500);
+            if (query) {
+                mainSearchInput.value = query; // Sync main search input
+                const results = await fetchResults(query);
+                displayCards(results, resultsGrid);
+                resultsTitle.textContent = `Results for "${query}"`;
+            } else {
+                resultsSection.classList.add('hidden');
+                noResults.classList.add('hidden');
+                initialContent.classList.remove('hidden');
+            }
+        });
+
+        // Synchronize inputs and handle autocomplete
+        mainSearchInput.addEventListener('input', () => {
+            stickySearchInput.value = mainSearchInput.value;
+            if (mainSearchInput.value.trim() === '') {
+                resultsSection.classList.add('hidden');
+                noResults.classList.add('hidden');
+                initialContent.classList.remove('hidden');
+                mainAutocompleteSuggestions.classList.remove('visible'); // Start fade-out if input is empty
+                setTimeout(() => {
+                    mainAutocompleteSuggestions.classList.add('hidden');
+                }, 500);
+            } else {
+                debouncedMainAutocomplete(mainSearchInput.value);
+            }
+        });
+
+        stickySearchInput.addEventListener('input', () => {
+            mainSearchInput.value = stickySearchInput.value;
+            if (stickySearchInput.value.trim() === '') {
+                resultsSection.classList.add('hidden');
+                noResults.classList.add('hidden');
+                initialContent.classList.remove('hidden');
+                stickyAutocompleteSuggestions.classList.remove('visible'); // Start fade-out if input is empty
+                setTimeout(() => {
+                    stickyAutocompleteSuggestions.classList.add('hidden');
+                }, 500);
+            } else {
+                debouncedStickyAutocomplete(stickySearchInput.value);
+            }
+        });
+
+        // Hide autocomplete suggestions when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!mainSearchForm.contains(e.target)) {
+                mainAutocompleteSuggestions.classList.remove('visible');
+                setTimeout(() => {
+                    mainAutocompleteSuggestions.classList.add('hidden');
+                }, 500);
+            }
+            if (!stickySearchForm.contains(e.target)) {
+                stickyAutocompleteSuggestions.classList.remove('visible');
+                setTimeout(() => {
+                    stickyAutocompleteSuggestions.classList.add('hidden');
+                }, 500);
+            }
+        });
+
+
+        modalClose.addEventListener('click', closeModal);
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                closeModal();
+            }
+        });
+        
+        // Close modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === "Escape" && !modalOverlay.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        // --- Sticky Header Scroll Logic ---
+        const scrollThreshold = 200; // Pixels to scroll before header appears
+
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > scrollThreshold) {
+                stickyHeader.style.top = '0'; // Show header
+            } else {
+                stickyHeader.style.top = '-100px'; // Hide header
+            }
+        });
+
+        // --- Initial Load ---
+        window.onload = async function() {
+            await fetchNewMovies();
+            await fetchRecommendations();
+        };
+
+    </script>
+</body>
+</html>
